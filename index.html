@@ -373,41 +373,52 @@
         <button id="addExpenseBtn" style="margin-top: 22px; width: 100%;">添加支出并扣减资产</button>
       </section>
       <section class="card">
-        <h2>花销记录</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>时间</th>
-              <th>金额</th>
-              <th>账户</th>
-              <th>分类</th>
-              <th>备注</th>
-            </tr>
-          </thead>
-          <tbody id="expenseTableBody">
-            <tr><td colspan="5" class="empty">暂无支出记录，请添加第一条支出。</td></tr>
-          </tbody>
-        </table>
+        <div class="asset-header">
+          <h2>花销记录</h2>
+          <button id="expenseToggle" class="asset-toggle">折叠记录</button>
+        </div>
+        <div id="expenseContent" class="asset-content">
+          <table>
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>金额</th>
+                <th>账户</th>
+                <th>分类</th>
+                <th>备注</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="expenseTableBody">
+              <tr><td colspan="6" class="empty">暂无支出记录，请添加第一条支出。</td></tr>
+            </tbody>
+          </table>
+        </div>
       </section>
       <section class="card">
-        <h2>每月花销统计</h2>
-        <button id="exportExcelBtn" style="margin-bottom: 16px; width: 100%;">导出Excel</button>
-        <table>
-          <thead>
-            <tr>
-              <th>月份</th>
-              <th>总花销</th>
-              <th>餐饮</th>
-              <th>交通</th>
-              <th>购物</th>
-              <th>娱乐</th>
-              <th>其他</th>
-            </tr>
-          </thead>
-          <tbody id="monthlyStatsBody">
-            <tr><td colspan="7" class="empty">暂无数据</td></tr>
-          </tbody>
-        </table>
+        <div class="asset-header">
+          <h2>每月花销统计</h2>
+          <button id="statsToggle" class="asset-toggle">折叠统计</button>
+        </div>
+        <div id="statsContent" class="asset-content">
+          <button id="exportExcelBtn" style="margin-bottom: 16px; width: 100%;">导出Excel</button>
+          <table>
+            <thead>
+              <tr>
+                <th>月份</th>
+                <th>总花销</th>
+                <th>餐饮</th>
+                <th>交通</th>
+                <th>购物</th>
+                <th>娱乐</th>
+                <th>其他</th>
+              </tr>
+            </thead>
+            <tbody id="monthlyStatsBody">
+              <tr><td colspan="7" class="empty">暂无数据</td></tr>
+            </tbody>
+          </table>
+        </div>
       </section>
       <section class="card chart-card">
         <h2>花销占比图</h2>
@@ -450,6 +461,10 @@
     const storageKey = 'accountData_v1';
     const monthlyStatsBody = document.getElementById('monthlyStatsBody');
     const exportExcelBtn = document.getElementById('exportExcelBtn');
+    const expenseToggle = document.getElementById('expenseToggle');
+    const expenseContent = document.getElementById('expenseContent');
+    const statsToggle = document.getElementById('statsToggle');
+    const statsContent = document.getElementById('statsContent');
     let expenses = [];
 
     function saveData() {
@@ -515,18 +530,29 @@
       debtDisplay.textContent = formatMoney(debt);
     }
 
-    function addExpenseRow({ time, amount, source, category, remark }) {
+    function addExpenseRow({ time, amount, source, category, remark }, index) {
       if (expenseTableBody.querySelector('.empty')) {
         expenseTableBody.innerHTML = '';
       }
       const row = document.createElement('tr');
+      const undoButton = document.createElement('button');
+      undoButton.textContent = '撤销';
+      undoButton.style.background = '#ff6b6b';
+      undoButton.style.color = 'white';
+      undoButton.style.border = 'none';
+      undoButton.style.borderRadius = '6px';
+      undoButton.style.padding = '4px 8px';
+      undoButton.style.cursor = 'pointer';
+      undoButton.addEventListener('click', () => undoExpense(index));
       row.innerHTML = `
         <td>${time}</td>
         <td>¥${formatMoney(amount)}</td>
         <td>${source}</td>
         <td>${category}</td>
         <td>${remark || '-'}</td>
+        <td></td>
       `;
+      row.lastElementChild.appendChild(undoButton);
       expenseTableBody.prepend(row);
     }
     function updateChart() {
@@ -612,6 +638,38 @@
       });
     }
 
+    function undoExpense(index) {
+      const expense = expenses[index];
+      if (!expense) return;
+      // 退还金额到账户
+      const source = expense.source;
+      let currentBalance;
+      if (source === '中国银行') {
+        currentBalance = parseFloat(cnbInput.value) || 0;
+        cnbInput.value = formatMoney(currentBalance + expense.amount);
+      } else if (source === '建设银行') {
+        currentBalance = parseFloat(ccbInput.value) || 0;
+        ccbInput.value = formatMoney(currentBalance + expense.amount);
+      } else if (source === '工商银行') {
+        currentBalance = parseFloat(icbcInput.value) || 0;
+        icbcInput.value = formatMoney(currentBalance + expense.amount);
+      } else if (source === '微信') {
+        currentBalance = parseFloat(weChatInput.value) || 0;
+        weChatInput.value = formatMoney(currentBalance + expense.amount);
+      } else if (source === '支付宝') {
+        currentBalance = parseFloat(aliInput.value) || 0;
+        aliInput.value = formatMoney(currentBalance + expense.amount);
+      }
+      // 移除记录
+      expenses.splice(index, 1);
+      // 更新显示
+      updateAssetDisplay();
+      renderExpenseTable();
+      updateChart();
+      updateMonthlyStats();
+      saveData();
+    }
+
     function exportToExcel() {
       const monthlyMap = new Map();
       expenses.forEach(({ time, amount, source, category, remark }) => {
@@ -641,12 +699,12 @@
 
     function renderExpenseTable() {
       if (!expenses.length) {
-        expenseTableBody.innerHTML = '<tr><td colspan="5" class="empty">暂无支出记录，请添加第一条支出。</td></tr>';
+        expenseTableBody.innerHTML = '<tr><td colspan="6" class="empty">暂无支出记录，请添加第一条支出。</td></tr>';
         return;
       }
       expenseTableBody.innerHTML = '';
       for (let i = expenses.length - 1; i >= 0; i -= 1) {
-        addExpenseRow(expenses[i]);
+        addExpenseRow(expenses[i], i);
       }
     }
 
@@ -698,7 +756,7 @@
         chartCategory
       };
       expenses.unshift(expenseEntry);
-      addExpenseRow(expenseEntry);
+      addExpenseRow(expenseEntry, 0);
       updateChart();
       updateMonthlyStats();
       saveData();
@@ -709,6 +767,16 @@
     assetToggle.addEventListener('click', () => {
       const hidden = assetContent.classList.toggle('hide');
       assetToggle.textContent = hidden ? '显示资产' : '隐藏资产';
+    });
+
+    expenseToggle.addEventListener('click', () => {
+      const hidden = expenseContent.classList.toggle('hide');
+      expenseToggle.textContent = hidden ? '展开记录' : '折叠记录';
+    });
+
+    statsToggle.addEventListener('click', () => {
+      const hidden = statsContent.classList.toggle('hide');
+      statsToggle.textContent = hidden ? '展开统计' : '折叠统计';
     });
 
     cnbInput.addEventListener('input', () => {
