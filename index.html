@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="format-detection" content="telephone=no" />
+  <title>记账页面</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: "Microsoft YaHei", Arial, sans-serif;
+      background: #0b1220;
+      color: #eef2ff;
+    }
+    .wrapper {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    header {
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    header h1 {
+      margin-bottom: 8px;
+      font-size: 2.4rem;
+      letter-spacing: 0.05em;
+    }
+    header p {
+      color: #aac1ff;
+    }
+    .panel {
+      display: grid;
+      gap: 20px;
+    }
+    .card {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 18px;
+      padding: 20px;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.18);
+    }
+    .card h2 {
+      margin-top: 0;
+      margin-bottom: 16px;
+      font-size: 1.2rem;
+      color: #cbe5ff;
+    }
+    .asset-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .asset-toggle {
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(44, 63, 116, 0.9);
+      color: #eef2ff;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+    .asset-toggle:hover {
+      background: rgba(79, 135, 255, 0.95);
+    }
+    .grid-auto {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      align-items: stretch;
+      width: 100%;
+      overflow-x: hidden;
+    }
+    .grid-auto.hide {
+      display: none;
+    }
+    .asset-content.hide {
+      display: none;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+      justify-content: center;
+    }
+    .grid-2 .field {
+      max-width: 360px;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 180px;
+      flex: 1 1 180px;
+      max-width: 260px;
+    }
+    input, select, textarea {
+      width: 100%;
+      min-width: 0;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 12px;
+      color: #eef2ff;
+      padding: 12px 14px;
+      font-size: 0.98rem;
+    }
+    @media (max-width: 880px) {
+      .grid-auto,
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+    label {
+      font-size: 0.95rem;
+      color: #a8b9ff;
+    }
+    input, select, textarea {
+      width: 100%;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 12px;
+      color: #eef2ff;
+      padding: 12px 14px;
+      font-size: 0.98rem;
+    }
+    select {
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+    }
+    option {
+      background: #071123;
+      color: #eef2ff;
+    }
+    textarea {
+      resize: vertical;
+      min-height: 88px;
+    }
+    button {
+      border: none;
+      border-radius: 14px;
+      padding: 14px 18px;
+      background: linear-gradient(135deg, #4fc3ff, #4778ff);
+      color: #08101e;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform .2s ease, box-shadow .2s ease;
+    }
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 24px rgba(79,195,255,0.3);
+    }
+    .summary {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .summary-item {
+      flex: 1 1 260px;
+      padding: 18px 20px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .summary-item strong {
+      display: block;
+      margin-bottom: 8px;
+      color: #fff;
+      font-size: 1.05rem;
+    }
+    .summary-item span {
+      font-size: 1.8rem;
+      color: #5ae2ff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+      font-size: 0.95rem;
+    }
+    .chart-card {
+      display: grid;
+      gap: 18px;
+    }
+    .chart-wrapper {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 24px;
+      align-items: center;
+    }
+    .chart-box {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 18px;
+      padding: 18px;
+      width: min(100%, 360px);
+    }
+    .chart-legend {
+      display: grid;
+      gap: 10px;
+      min-width: 220px;
+      width: min(100%, 320px);
+    }
+    .chart-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.05);
+    }
+    .chart-key {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    .chart-legend-item span {
+      color: #d7e0ff;
+      font-size: 0.95rem;
+      word-break: break-word;
+    }
+    th, td {
+      padding: 12px 10px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    th {
+      color: #cbe5ff;
+      font-weight: 600;
+    }
+    td {
+      color: #d7e0ff;
+    }
+    .empty {
+      color: #7d8ebf;
+    }
+    @media (max-width: 840px) {
+      .grid-3, .grid-2 {
+        grid-template-columns: 1fr;
+      }
+      .summary {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <header>
+      <h1>记账管理系统</h1>
+      <p>输入资产余额，记录分类花销，系统会自动更新总资产与各项金额。</p>
+    </header>
+    <div class="panel">
+      <section class="card">
+        <div class="asset-header">
+          <h2>资产余额</h2>
+          <button id="assetToggle" class="asset-toggle">隐藏资产</button>
+        </div>
+        <div id="assetContent" class="asset-content">
+          <div id="assetInputs" class="grid-auto">
+            <div class="field">
+              <label for="cnbBalance">中国银行余额</label>
+              <input id="cnbBalance" type="number" min="0" step="0.01" value="0" />
+            </div>
+          <div class="field">
+            <label for="ccbBalance">建设银行余额</label>
+            <input id="ccbBalance" type="number" min="0" step="0.01" value="0" />
+          </div>
+          <div class="field">
+            <label for="icbcBalance">工商银行余额</label>
+            <input id="icbcBalance" type="number" min="0" step="0.01" value="0" />
+          </div>
+          <div class="field">
+            <label for="weChatBalance">微信余额</label>
+            <input id="weChatBalance" type="number" min="0" step="0.01" value="0" />
+          </div>
+          <div class="field">
+            <label for="aliBalance">支付宝余额</label>
+            <input id="aliBalance" type="number" min="0" step="0.01" value="0" />
+          </div>
+          <div class="field">
+            <label for="loanBalance">借出款</label>
+            <input id="loanBalance" type="number" min="0" step="0.01" value="0" />
+          </div>
+          <div class="field">
+            <label for="debtBalance">欠款</label>
+            <input id="debtBalance" type="number" min="0" step="0.01" value="0" />
+          </div>
+        </div>
+        <div class="summary" style="margin-top: 20px;">
+          <div class="summary-item">
+            <strong>当前总资产</strong>
+            <span id="totalAssets">0.00</span>
+          </div>
+          <div class="summary-item">
+            <strong>中国银行余额</strong>
+            <span id="cnbDisplay">0.00</span>
+          </div>
+          <div class="summary-item">
+            <strong>建设银行余额</strong>
+            <span id="ccbDisplay">0.00</span>
+          </div>
+          <div class="summary-item">
+            <strong>工商银行余额</strong>
+            <span id="icbcDisplay">0.00</span>
+          </div>
+          <div class="summary-item">
+            <strong>微信余额</strong>
+            <span id="wechatDisplay">0.00</span>
+          </div>
+          <div class="summary-item">
+            <strong>支付宝余额</strong>
+            <span id="aliDisplay">0.00</span>
+          </div>
+          <div class="summary-item">
+            <strong>借出款</strong>
+            <span id="loanDisplay">0.00</span>
+          </div>
+          <div class="summary-item">
+            <strong>欠款</strong>
+            <span id="debtDisplay">0.00</span>
+          </div>
+        </div>
+      </div>
+      </section>
+      <section class="card">
+        <h2>新增花销</h2>
+        <div class="grid-2">
+          <div class="field">
+            <label for="expenseAmount">花销金额</label>
+            <input id="expenseAmount" type="number" min="0" step="0.01" placeholder="请输入支出金额" />
+          </div>
+          <div class="field">
+            <label for="expenseSource">扣减账户</label>
+            <select id="expenseSource">
+              <option value="cnb">中国银行</option>
+              <option value="ccb">建设银行</option>
+              <option value="icbc">工商银行</option>
+              <option value="wechat">微信</option>
+              <option value="ali">支付宝</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid-2" style="margin-top: 16px;">
+          <div class="field">
+            <label for="expenseCategory">支出分类</label>
+            <select id="expenseCategory">
+              <option value="餐饮">餐饮</option>
+              <option value="交通">交通</option>
+              <option value="购物">购物</option>
+              <option value="娱乐">娱乐</option>
+              <option value="其他">其他</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="expenseRemark">备注说明</label>
+            <input id="expenseRemark" type="text" placeholder="填写支出备注" />
+          </div>
+        </div>
+        <button id="addExpenseBtn" style="margin-top: 22px; width: 100%;">添加支出并扣减资产</button>
+      </section>
+      <section class="card">
+        <h2>花销记录</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>时间</th>
+              <th>金额</th>
+              <th>账户</th>
+              <th>分类</th>
+              <th>备注</th>
+            </tr>
+          </thead>
+          <tbody id="expenseTableBody">
+            <tr><td colspan="5" class="empty">暂无支出记录，请添加第一条支出。</td></tr>
+          </tbody>
+        </table>
+      </section>
+      <section class="card">
+        <h2>每月花销统计</h2>
+        <button id="exportExcelBtn" style="margin-bottom: 16px; width: 100%;">导出Excel</button>
+        <table>
+          <thead>
+            <tr>
+              <th>月份</th>
+              <th>总花销</th>
+              <th>餐饮</th>
+              <th>交通</th>
+              <th>购物</th>
+              <th>娱乐</th>
+              <th>其他</th>
+            </tr>
+          </thead>
+          <tbody id="monthlyStatsBody">
+            <tr><td colspan="7" class="empty">暂无数据</td></tr>
+          </tbody>
+        </table>
+      </section>
+      <section class="card chart-card">
+        <h2>花销占比图</h2>
+        <div class="chart-wrapper">
+          <div class="chart-box">
+            <canvas id="expenseChart" width="360" height="360"></canvas>
+          </div>
+          <div id="chartLegend" class="chart-legend"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+  <script>
+    const cnbInput = document.getElementById('cnbBalance');
+    const ccbInput = document.getElementById('ccbBalance');
+    const icbcInput = document.getElementById('icbcBalance');
+    const weChatInput = document.getElementById('weChatBalance');
+    const aliInput = document.getElementById('aliBalance');
+    const loanInput = document.getElementById('loanBalance');
+    const debtInput = document.getElementById('debtBalance');
+    const totalAssets = document.getElementById('totalAssets');
+    const cnbDisplay = document.getElementById('cnbDisplay');
+    const ccbDisplay = document.getElementById('ccbDisplay');
+    const icbcDisplay = document.getElementById('icbcDisplay');
+    const wechatDisplay = document.getElementById('wechatDisplay');
+    const aliDisplay = document.getElementById('aliDisplay');
+    const loanDisplay = document.getElementById('loanDisplay');
+    const debtDisplay = document.getElementById('debtDisplay');
+    const assetToggle = document.getElementById('assetToggle');
+    const assetContent = document.getElementById('assetContent');
+    const expenseAmount = document.getElementById('expenseAmount');
+    const expenseSource = document.getElementById('expenseSource');
+    const expenseCategory = document.getElementById('expenseCategory');
+    const expenseRemark = document.getElementById('expenseRemark');
+    const addExpenseBtn = document.getElementById('addExpenseBtn');
+    const expenseTableBody = document.getElementById('expenseTableBody');
+    const expenseChart = document.getElementById('expenseChart');
+    const chartLegend = document.getElementById('chartLegend');
+    const chartCtx = expenseChart.getContext('2d');
+    const storageKey = 'accountData_v1';
+    const monthlyStatsBody = document.getElementById('monthlyStatsBody');
+    const exportExcelBtn = document.getElementById('exportExcelBtn');
+    let expenses = [];
+
+    function saveData() {
+      const state = {
+        assets: {
+          cnb: cnbInput.value,
+          ccb: ccbInput.value,
+          icbc: icbcInput.value,
+          wechat: weChatInput.value,
+          ali: aliInput.value,
+          debt: debtInput.value
+        },
+        expenses
+      };
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(state));
+      } catch (error) {
+        console.warn('存储失败', error);
+      }
+    }
+
+    function loadData() {
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) return;
+        const state = JSON.parse(raw);
+        if (state.assets) {
+          cnbInput.value = state.assets.cnb ?? cnbInput.value;
+          ccbInput.value = state.assets.ccb ?? ccbInput.value;
+          icbcInput.value = state.assets.icbc ?? icbcInput.value;
+          weChatInput.value = state.assets.wechat ?? weChatInput.value;
+          aliInput.value = state.assets.ali ?? aliInput.value;
+          loanInput.value = state.assets.loan ?? loanInput.value;
+          debtInput.value = state.assets.debt ?? debtInput.value;
+        }
+        if (Array.isArray(state.expenses)) {
+          expenses = state.expenses;
+        }
+      } catch (error) {
+        console.warn('读取存储数据失败', error);
+      }
+    }
+
+    function formatMoney(value) {
+      return Number(value).toFixed(2);
+    }
+
+    function updateAssetDisplay() {
+      const cnb = parseFloat(cnbInput.value) || 0;
+      const ccb = parseFloat(ccbInput.value) || 0;
+      const icbc = parseFloat(icbcInput.value) || 0;
+      const wechat = parseFloat(weChatInput.value) || 0;
+      const ali = parseFloat(aliInput.value) || 0;
+      const loan = parseFloat(loanInput.value) || 0;
+      const debt = parseFloat(debtInput.value) || 0;
+      totalAssets.textContent = formatMoney(cnb + ccb + icbc + wechat + ali + loan - debt);
+      cnbDisplay.textContent = formatMoney(cnb);
+      ccbDisplay.textContent = formatMoney(ccb);
+      icbcDisplay.textContent = formatMoney(icbc);
+      wechatDisplay.textContent = formatMoney(wechat);
+      aliDisplay.textContent = formatMoney(ali);
+      loanDisplay.textContent = formatMoney(loan);
+      debtDisplay.textContent = formatMoney(debt);
+    }
+
+    function addExpenseRow({ time, amount, source, category, remark }) {
+      if (expenseTableBody.querySelector('.empty')) {
+        expenseTableBody.innerHTML = '';
+      }
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${time}</td>
+        <td>¥${formatMoney(amount)}</td>
+        <td>${source}</td>
+        <td>${category}</td>
+        <td>${remark || '-'}</td>
+      `;
+      expenseTableBody.prepend(row);
+    }
+    function updateChart() {
+      if (!chartCtx) return;
+      const categoryMap = new Map();
+      expenses.forEach(({ amount, category, remark }) => {
+        const key = category === '其他' ? (remark || '其他') : category;
+        categoryMap.set(key, (categoryMap.get(key) || 0) + amount);
+      });
+      chartCtx.clearRect(0, 0, expenseChart.width, expenseChart.height);
+      chartLegend.innerHTML = '';
+      const items = Array.from(categoryMap.entries());
+      if (!items.length) {
+        chartCtx.fillStyle = '#1b2140';
+        chartCtx.fillRect(0, 0, expenseChart.width, expenseChart.height);
+        chartCtx.fillStyle = '#aac1ff';
+        chartCtx.font = '16px Arial';
+        chartCtx.textAlign = 'center';
+        chartCtx.fillText('暂无花销', expenseChart.width / 2, expenseChart.height / 2);
+        return;
+      }
+      const colors = ['#5ad2ff', '#7c84ff', '#ff8f6b', '#ffca5a', '#75ff9e', '#f86cff', '#66cff7', '#a7f6ff'];
+      const total = items.reduce((sum, [, value]) => sum + value, 0);
+      let startAngle = -Math.PI / 2;
+      items.forEach(([key, value], index) => {
+        const sliceAngle = (value / total) * Math.PI * 2;
+        chartCtx.beginPath();
+        chartCtx.moveTo(expenseChart.width / 2, expenseChart.height / 2);
+        chartCtx.arc(expenseChart.width / 2, expenseChart.height / 2, expenseChart.width / 2 - 24, startAngle, startAngle + sliceAngle);
+        chartCtx.closePath();
+        chartCtx.fillStyle = colors[index % colors.length];
+        chartCtx.fill();
+        startAngle += sliceAngle;
+        const legendItem = document.createElement('div');
+        legendItem.className = 'chart-legend-item';
+        legendItem.innerHTML = `
+          <span class="chart-key" style="background:${colors[index % colors.length]};"></span>
+          <span>${key} (${((value / total) * 100).toFixed(1)}%)</span>
+        `;
+        chartLegend.appendChild(legendItem);
+      });
+      chartCtx.beginPath();
+      chartCtx.fillStyle = '#0b1220';
+      chartCtx.arc(expenseChart.width / 2, expenseChart.height / 2, expenseChart.width / 2 - 82, 0, Math.PI * 2);
+      chartCtx.fill();
+    }
+
+    function updateMonthlyStats() {
+      if (!monthlyStatsBody) return;
+      const monthlyMap = new Map();
+      expenses.forEach(({ time, amount, category }) => {
+        const date = new Date(time);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        if (!monthlyMap.has(monthKey)) {
+          monthlyMap.set(monthKey, { total: 0, 餐饮: 0, 交通: 0, 购物: 0, 娱乐: 0, 其他: 0 });
+        }
+        const monthData = monthlyMap.get(monthKey);
+        monthData.total += amount;
+        if (category in monthData) {
+          monthData[category] += amount;
+        } else {
+          monthData.其他 += amount;
+        }
+      });
+      const sortedMonths = Array.from(monthlyMap.entries()).sort(([a], [b]) => b.localeCompare(a));
+      if (!sortedMonths.length) {
+        monthlyStatsBody.innerHTML = '<tr><td colspan="7" class="empty">暂无数据</td></tr>';
+        return;
+      }
+      monthlyStatsBody.innerHTML = '';
+      sortedMonths.forEach(([month, data]) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${month}</td>
+          <td>¥${formatMoney(data.total)}</td>
+          <td>¥${formatMoney(data.餐饮)}</td>
+          <td>¥${formatMoney(data.交通)}</td>
+          <td>¥${formatMoney(data.购物)}</td>
+          <td>¥${formatMoney(data.娱乐)}</td>
+          <td>¥${formatMoney(data.其他)}</td>
+        `;
+        monthlyStatsBody.appendChild(row);
+      });
+    }
+
+    function exportToExcel() {
+      const monthlyMap = new Map();
+      expenses.forEach(({ time, amount, source, category, remark }) => {
+        const date = new Date(time);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        if (!monthlyMap.has(monthKey)) {
+          monthlyMap.set(monthKey, []);
+        }
+        monthlyMap.get(monthKey).push({ time, amount, source, category, remark });
+      });
+      const workbook = XLSX.utils.book_new();
+      const sortedMonths = Array.from(monthlyMap.entries()).sort(([a], [b]) => b.localeCompare(a));
+      sortedMonths.forEach(([month, records]) => {
+        const data = [['时间', '金额', '账户', '分类', '备注']];
+        let total = 0;
+        records.forEach(record => {
+          const exportCategory = record.category === '其他' ? (record.remark || '其他') : record.category;
+          data.push([record.time, record.amount, record.source, exportCategory, record.remark || '']);
+          total += record.amount;
+        });
+        data.push(['总计', total, '', '', '']);
+        const worksheet = XLSX.utils.aoa_to_sheet(data);
+        XLSX.utils.book_append_sheet(workbook, worksheet, month);
+      });
+      XLSX.writeFile(workbook, 'monthly_expenses.xlsx');
+    }
+
+    function renderExpenseTable() {
+      if (!expenses.length) {
+        expenseTableBody.innerHTML = '<tr><td colspan="5" class="empty">暂无支出记录，请添加第一条支出。</td></tr>';
+        return;
+      }
+      expenseTableBody.innerHTML = '';
+      for (let i = expenses.length - 1; i >= 0; i -= 1) {
+        addExpenseRow(expenses[i]);
+      }
+    }
+
+    addExpenseBtn.addEventListener('click', () => {
+      const amount = parseFloat(expenseAmount.value);
+      if (isNaN(amount) || amount <= 0) {
+        alert('请输入有效的支出金额。');
+        return;
+      }
+      const source = expenseSource.value;
+      const category = expenseCategory.value;
+      const remark = expenseRemark.value.trim();
+      let currentBalance;
+      if (source === 'cnb') {
+        currentBalance = parseFloat(cnbInput.value) || 0;
+      } else if (source === 'ccb') {
+        currentBalance = parseFloat(ccbInput.value) || 0;
+      } else if (source === 'icbc') {
+        currentBalance = parseFloat(icbcInput.value) || 0;
+      } else if (source === 'wechat') {
+        currentBalance = parseFloat(weChatInput.value) || 0;
+      } else if (source === 'ali') {
+        currentBalance = parseFloat(aliInput.value) || 0;
+      }
+      if (amount > currentBalance) {
+        if (!confirm('当前账户余额不足，仍要继续记录并允许负余额吗？')) {
+          return;
+        }
+      }
+      if (source === 'cnb') {
+        cnbInput.value = formatMoney(currentBalance - amount);
+      } else if (source === 'ccb') {
+        ccbInput.value = formatMoney(currentBalance - amount);
+      } else if (source === 'icbc') {
+        icbcInput.value = formatMoney(currentBalance - amount);
+      } else if (source === 'wechat') {
+        weChatInput.value = formatMoney(currentBalance - amount);
+      } else if (source === 'ali') {
+        aliInput.value = formatMoney(currentBalance - amount);
+      }
+      updateAssetDisplay();
+      const chartCategory = category === '其他' ? (remark || '其他') : category;
+      const expenseEntry = {
+        time: new Date().toLocaleString('zh-CN', { hour12: false }),
+        amount,
+        source: source === 'cnb' ? '中国银行' : source === 'ccb' ? '建设银行' : source === 'icbc' ? '工商银行' : source === 'wechat' ? '微信' : '支付宝',
+        category,
+        remark,
+        chartCategory
+      };
+      expenses.unshift(expenseEntry);
+      addExpenseRow(expenseEntry);
+      updateChart();
+      updateMonthlyStats();
+      saveData();
+      expenseAmount.value = '';
+      expenseRemark.value = '';
+    });
+
+    assetToggle.addEventListener('click', () => {
+      const hidden = assetContent.classList.toggle('hide');
+      assetToggle.textContent = hidden ? '显示资产' : '隐藏资产';
+    });
+
+    cnbInput.addEventListener('input', () => {
+      updateAssetDisplay();
+      saveData();
+    });
+    ccbInput.addEventListener('input', () => {
+      updateAssetDisplay();
+      saveData();
+    });
+    icbcInput.addEventListener('input', () => {
+      updateAssetDisplay();
+      saveData();
+    });
+    weChatInput.addEventListener('input', () => {
+      updateAssetDisplay();
+      saveData();
+    });
+    aliInput.addEventListener('input', () => {
+      updateAssetDisplay();
+      saveData();
+    });
+    loanInput.addEventListener('input', () => {
+      updateAssetDisplay();
+      saveData();
+    });
+    debtInput.addEventListener('input', () => {
+      updateAssetDisplay();
+      saveData();
+    });
+
+    loadData();
+    updateAssetDisplay();
+    renderExpenseTable();
+    updateChart();
+    updateMonthlyStats();
+
+    exportExcelBtn.addEventListener('click', exportToExcel);
+  </script>
+</body>
+</html>
